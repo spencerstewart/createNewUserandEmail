@@ -74,29 +74,20 @@ $user | Add-Member -NotePropertyName company -NotePropertyValue $company
 $user | Add-Member -NotePropertyName upnSuffix -NotePropertyValue $upnSuffix
 $user | Add-Member -NotePropertyName resortSuffix -NotePropertyValue $resortSuffix
 
-### REQUIRED DETAILS ###
+# Required details
 Write-Host "### REQUIRED DETAILS ###" -ForegroundColor DarkGray
 
-$user.fname = Read-Host "(REQUIRED) First Name"
-$user.lname = Read-Host "(REQUIRED) Last Name"
-
-# Display Name with Default
+$user.fname = Read-Host "First Name [required]"
+$user.lname = Read-Host "Last Name [required]"
 $user.name = "$($user.fname) $($user.lname) $resortSuffix"
-$prompt = Read-Host "(REQUIRED) Display Name [$($user.name)]"
+$prompt = Read-Host "Display Name [default: $($user.name)]"
 $user.name = ($user.name,$prompt)[[bool]$prompt]
-
-# Alias. Connects to Exchange Online to verify availability.
-$user.alias = Read-Host "(REQUIRED) Alias"
-Write-Host "### Connecting to Exchange Online to verify alias availability ###" -ForegroundColor DarkGray
-Connect-EXOPSSession -WarningAction SilentlyContinue
-$user.alias = CheckAlias -alias $user.alias
-Get-PSSession | Remove-PSSession
-
+$user.alias = CheckAlias -signIn $true
+#$user.alias = Read-Host "Alias [required]" # For testing only
 $user.extAttr3 = GetExtAttr3
-$user.tempPassword = Read-Host "(REQUIRED) Temporary Password" -AsSecureString
+$user.tempPassword = Read-Host "Temporary Password [required]" -AsSecureString
 
-
-### STRONGLY SUGGESTED DETAILS ###
+# Strongly suggested details
 Write-Host "### OPTIONAL BUT SUGGESTED DETAILS ###" -ForegroundColor DarkGray
 
 $user.managerAlias = Get-RealADUser -userType "Manager"
@@ -107,13 +98,21 @@ $user.description = Read-Host "Description [optional]"
 $user.office = Read-Host "Office [optional]"
 $user.officePhone = Read-Host "Office Phone [optional]"
 
+# Default details
+Write-Host "### DEFAULT DETAILS ###" -ForegroundColor DarkGray
+$prompt = Read-Host "extensionAttribute2 [default: $($user.extAttr2)]"
+$user.extAttr2 = ($user.extAttr2,$prompt)[[bool]$prompt]
+$prompt = Read-Host "Company [default: $($user.company)]"
+$user.company = ($user.company,$prompt)[[bool]$prompt]
+$prompt = Read-Host "UPN Suffix [default: $($user.upnSuffix)]"
+$user.upnSuffix = ($user.upnSuffix,$prompt)[[bool]$prompt]
 
 
 
 
 # Create remote user, assign attributes, clone security groups
 Write-Host "### CONNECTING TO ON PREM EXCHANGE ###" -ForegroundColor DarkGray
-
+# $UserCredential = Get-Credential -Credential $null -Message "Enter your Exchange On-Prem credentials"
 $UserCredential = $host.ui.PromptForCredential("Exchange On-Prem Credentials", "Please enter your Exchange On-Prem Creds.", "", "NetBiosUserName")
 ConnectToOnPremExchange $ExchangeServerName
 
