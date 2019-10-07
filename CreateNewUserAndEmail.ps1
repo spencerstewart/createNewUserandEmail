@@ -39,6 +39,10 @@ $newUserOU = "OU=New Users,OU=Standard User,OU=BBMR Users,OU=Snow_Summit_LLC,DC=
 # Local Exchange Server FQDN
 $ExchangeServerName = "bbmr-exch2013.bbmr.local"
 
+# Domain Controller. Use FQDN
+$DomainController = "bbmrdc1-2012.bbmr.local"
+#$DomainController = "vm-den-dc01.iDirectory.itw"
+
 # UPN Suffix
 $upnSuffix = "bbmr.com"
 
@@ -129,6 +133,7 @@ function CreateRemoteMailboxUser
          -Password $tempPassword `
          -OnPremisesOrganizationalUnit $newUserOU `
          -ResetPasswordOnNextLogon:$true `
+         -DomainController $DomainController `
          | Out-Null
 }
 
@@ -141,7 +146,8 @@ function AddAdditionalAttributesToUser
     # Add additional attributes in AD
     Write-Host "[$alias] Setting additional attributes" -ForegroundColor Green
 
-    $command = "Set-ADUser -Credential `$UserCredential -Identity $alias -Replace @{
+    $command = "Set-ADUser -Credential `$UserCredential -Identity $alias -Server $DomainController `
+        -Replace @{
         extensionAttribute2=`"$extAttr2`"
         extensionAttribute3=`"$extAttr3`"
     }"
@@ -171,7 +177,7 @@ function CloneSecurityGroupMembership
         try {
             Get-ADUser -Identity "$sourceUser" -Properties memberof |
                 Select-Object -ExpandProperty memberof |
-                    Add-ADGroupMember -Credential $UserCredential -Members "$targetUser"
+                    Add-ADGroupMember -Credential $UserCredential -Server $DomainController -Members "$targetUser"
 
             Write-Host "[$targetUser] Security group membership cloned from $sourceUser" -ForegroundColor Green
         } catch {
