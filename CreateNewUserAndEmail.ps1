@@ -146,8 +146,7 @@ function AddAdditionalAttributesToUser
     # Add additional attributes in AD
     Write-Host "[$alias] Setting additional attributes" -ForegroundColor Green
 
-    $command = "Set-ADUser -Credential `$UserCredential -Identity $alias -Server $DomainController `
-        -Replace @{
+    $command = "Set-ADUser -Credential `$UserCredential -Identity $alias -Server $DomainController -Replace @{
         extensionAttribute2=`"$extAttr2`"
         extensionAttribute3=`"$extAttr3`"
     }"
@@ -298,13 +297,14 @@ $user.name = "$($user.fname) $($user.lname) $resortSuffix"
 $prompt = Read-Host "Display Name [default: $($user.name)]"
 $user.name = ($user.name,$prompt)[[bool]$prompt]
 $user.alias = GetUnusedAlias
+#$user.alias = Read-Host "Alias [required]" # For testing only
 $user.extAttr3 = GetExtAttr3
 $user.tempPassword = Read-Host "Temporary Password [required]" -AsSecureString
 
 # Strongly suggested details
 Write-Host "### OPTIONAL BUT SUGGESTED DETAILS ###" -ForegroundColor DarkGray
 
-$user.managerAlias = Get-RealADUser "Manager"
+$user.managerAlias = Get-RealADUser -userType "Manager"
 $user.userToCloneSecurityGroups = Get-RealADUser "Source user to copy security groups"
 $user.title = Read-Host "Title [optional]"
 $user.department = Read-Host "Department [optional]"
