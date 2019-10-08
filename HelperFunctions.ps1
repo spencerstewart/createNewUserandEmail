@@ -33,12 +33,13 @@ $newUserOU = "OU=New Users,OU=Standard User,OU=BBMR Users,OU=Snow_Summit_LLC,DC=
 
 # Local Exchange Server FQDN
 $ExchangeServerName = "bbmr-exch2013.bbmr.local"
+# vm-den-exch01.iDirectory.itw | msa-exch2013.mmsa.local | bbmr-exch2013.bbmr.local
 
-# Domain Controller. Use FQDN
+# Domain Controller FQDN
 $DomainController = "bbmrdc1-2012.bbmr.local"
-#$DomainController = "vm-den-dc01.iDirectory.itw"
+# vm-den-dc01.iDirectory.itw | msa-ad1.mmsa.local | bbmrdc1-2012.bbmr.local
 
-# UPN Suffix
+# UPN Suffix (without the @ sign)
 $upnSuffix = "bbmr.com"
 
 # Display Name Suffix. Include the parentheses - eg "(DEN)" for the user "John Doe (DEN)"
@@ -55,6 +56,22 @@ $company = "BBMR"
 #####################################################
 
 
+
+# Write configuration information to user
+Write-Host "
+################################################################# `
+    This script will attempt to create user objects with the following `
+    - Exchange Server: $ExchangeServerName `
+    - Domain Controller: $DomainController `
+    - ExtensionAttribute2: $resortCode `
+    - Resort UPN Suffix: $upnSuffix `
+    - Company in AD: $company `
+    `
+    If these values should be changed, please edit this script in the 'Resort Config' section.
+    You can cancel the script by entering Ctrl + C.
+    You can accept the default values by simply pressing Enter.
+#################################################################
+    " -ForegroundColor DarkGray
 
 
 # BEGIN: Helper functions used by the script
@@ -161,27 +178,14 @@ function CloneSecurityGroupMembership
 {
     param($sourceUser, $targetUser)
     
-    # Copy Security Groups
-    if (![string]::IsNullOrWhiteSpace($sourceUser))
-    {
-        try {
-            Get-ADUser -Identity "$sourceUser" -Properties memberof |
-                Select-Object -ExpandProperty memberof |
-                    Add-ADGroupMember -Credential $UserCredential -Server $DomainController -Members "$targetUser"
+    Get-ADUser -Identity $sourceUser -Properties memberof |
+        Select-Object -ExpandProperty memberof |
+            Add-ADGroupMember -Credential $UserCredential -Server $DomainController -Members "$targetUser"
 
-            Write-Host "[$targetUser] Security group membership cloned from $sourceUser" -ForegroundColor Green
-        } catch {
-            Write-Host "[$targetUser] [error] Could not find source user: $sourceUser"            
-        }
-    } else {
-        Write-Host "[$targetUser] No source user provided. Group membership was NOT cloned."
-    }
-
-    
-
-    Write-Host
+    Write-Host "[$targetUser] Security group membership cloned from $sourceUser" -ForegroundColor Green
 }
 
+# Validate Extension Attribute 3
 function GetExtAttr3
 {
     
@@ -190,13 +194,13 @@ function GetExtAttr3
         $extAttr3 = Read-Host "ExtensionAttribute3 (licensing) [required]"
         
         if ($extAttr3 -eq "F1;" -or $extAttr3 -eq "E1;" -or $extAttr3 -eq "E3;") {
-            $validExtAttr3 = $true;
+            $extAttr3IsValid = $true;
         } else {
             Write-Host "ExtensionAttribute 3 is invalid. Please use 'F1;', 'E1;', or 'E3;'." -ForegroundColor Red
-            $validExtAttr3 = $false;
+            $extAttr3IsValid = $false;
         }
 
-    } until ($validExtAttr3)
+    } until ($extAttr3IsValid)
 
     $extAttr3
 }
@@ -211,11 +215,11 @@ function Get-RealADUser
     {
         try {
             if ([string]::IsNullOrWhiteSpace($samAccountName)) {
-                $validUser = $true # Break out of loop if no entry specified
+                $isValidUser = $true # Break out of loop if no entry specified
             } else {
                 $ADUser = Get-ADUser -Identity $samAccountName
                 Write-Host "Using $($ADUser.Name) ($samAccountName) as $userType" -ForegroundColor DarkGray
-                $validUser = $true
+                $isValidUser = $true
             }
         }
         catch {
@@ -223,12 +227,12 @@ function Get-RealADUser
             $samAccountName = Read-Host "Enter a different alias or type 'S' to skip"
             if ($samAccountName.ToLower() -eq "s") {
                 $samAccountName = ""
-                $validUser= $true
+                $isValidUser= $true
             } else {
-                $validUser = $false
+                $isValidUser = $false
             }
         }
-    } until ($validUser)
+    } until ($isValidUser)
 
     $samAccountName
 }
