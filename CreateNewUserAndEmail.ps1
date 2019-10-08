@@ -43,7 +43,6 @@ $user | Add-Member -NotePropertyName lname -NotePropertyValue ""
 $user | Add-Member -NotePropertyName name -NotePropertyValue ""
 $user | Add-Member -NotePropertyName alias -NotePropertyValue ""
 $user | Add-Member -NotePropertyName tempPassword -NotePropertyValue ""
-$user | Add-Member -NotePropertyName extAttr2 -NotePropertyValue $resortCode
 $user | Add-Member -NotePropertyName extAttr3 -NotePropertyValue ""
 $user | Add-Member -NotePropertyName title -NotePropertyValue ""
 $user | Add-Member -NotePropertyName department -NotePropertyValue ""
@@ -59,30 +58,30 @@ $user | Add-Member -NotePropertyName resortSuffix -NotePropertyValue $resortSuff
 ### GET REQUIRED DETAILS ###
 Write-Host "### REQUIRED DETAILS ###" -ForegroundColor DarkGray
 
-$user.fname = Read-Host "(REQUIRED) First Name"
-$user.lname = Read-Host "(REQUIRED) Last Name"
+$user.fname = Read-Host "First Name"
+$user.lname = Read-Host "Last Name"
 
 # Display Name with suggested default
 $user.name = "$($user.fname) $($user.lname) $resortSuffix"
-$prompt = Read-Host "(REQUIRED) Display Name [$($user.name)]"
+$prompt = Read-Host "Display Name [$($user.name)]"
 $user.name = ($user.name,$prompt)[[bool]$prompt]
 
 # Alias. Connects to Exchange Online to verify availability.
-$user.alias = Read-Host "(REQUIRED) Alias"
-Write-Host "### Connecting to Exchange Online to verify alias availability ###" -ForegroundColor DarkGray
+$user.alias = Read-Host "Alias"
+Write-Host "`n### Connecting to Exchange Online to verify alias availability ###" -ForegroundColor DarkGray
 Connect-EXOPSSession -WarningAction SilentlyContinue
-$user.alias = CheckAlias -alias $user.alias
+$user.alias = CheckAliasAvailability -alias $user.alias
 Get-PSSession | Remove-PSSession
 
 $user.extAttr3 = GetExtAttr3
-$user.tempPassword = Read-Host "(REQUIRED) Temporary Password" -AsSecureString
+$user.tempPassword = Read-Host "Temporary Password" -AsSecureString
 
 
 ### GET SUGGESTED DETAILS ###
-Write-Host "### OPTIONAL BUT SUGGESTED DETAILS ###" -ForegroundColor DarkGray
+Write-Host "`n### OPTIONAL BUT SUGGESTED DETAILS ###" -ForegroundColor DarkGray
 
 $user.managerAlias = Get-RealADUser -userType "Manager"
-$user.userToCloneSecurityGroups = Get-RealADUser "Source user to copy security groups"
+$user.userToCloneSecurityGroups = Get-RealADUser -userType "Source user to copy security groups"
 $user.title = Read-Host "Title [optional]"
 $user.department = Read-Host "Department [optional]"
 $user.description = Read-Host "Description [optional]"
@@ -92,14 +91,14 @@ $user.officePhone = Read-Host "Office Phone [optional]"
 
 ### DO THE WORK ###
 # Create remote mailbox user
-Write-Host "### CONNECTING TO ON PREM EXCHANGE ###" -ForegroundColor DarkGray
+Write-Host "`n### CONNECTING TO ON PREM EXCHANGE ###" -ForegroundColor DarkGray
 $UserCredential = $host.ui.PromptForCredential("Exchange On-Prem Credentials", "Please enter your Exchange On-Prem Creds.", "", "NetBiosUserName")
 ConnectToOnPremExchange $ExchangeServerName
-CreateRemoteMailboxUser $user.fname $user.lname $user.name $user.alias $user.tempPassword $user.upnSuffix $user.resortSuffix $newUserOU -isFromCSV $false
+CreateRemoteMailboxUser $user.fname $user.lname $user.name $user.alias $user.tempPassword $newUserOU -isFromCSV $false
 
 
 # Add additional attributes
-AddAdditionalAttributesToUser $user.alias $user.description $user.office $user.officePhone $user.title $user.department $user.company $user.managerAlias $user.extAttr2 $user.extAttr3
+AddAdditionalAttributesToUser $user.alias $user.description $user.office $user.officePhone $user.title $user.department $user.managerAlias $user.extAttr3
 
 
 # Clone security group membership if sourceUser provided

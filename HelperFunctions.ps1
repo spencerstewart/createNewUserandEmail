@@ -15,6 +15,7 @@
 .NOTES
     
 .TODO
+    Cleaner fail if Exchange On-Prem username is incorrect
 
 .AUTHOR
     Spencer Stewart, Big Bear Mountain Resort
@@ -64,6 +65,7 @@ Write-Host "
     - Exchange Server: $ExchangeServerName `
     - Domain Controller: $DomainController `
     - ExtensionAttribute2: $resortCode `
+    - Resort Suffix: $resortSuffix `
     - Resort UPN Suffix: $upnSuffix `
     - Company in AD: $company `
     `
@@ -78,7 +80,7 @@ Write-Host "
 
 
 # Checks availability in the tenant for the alias. Returns an available alias.
-function CheckAlias
+function CheckAliasAvailability
 {
     param($alias)
 
@@ -91,8 +93,8 @@ function CheckAlias
         if ($DisplayName -ne $null)
         {
             $aliasIsAvailable = $false
-            Write-Host "[$alias] Alias is taken by $DisplayName" -ForegroundColor Red
-            $alias = Read-Host "Enter a different alias"
+            Write-Host "[$($user.alias)] Alias is taken by $DisplayName" -ForegroundColor Red
+            $alias = Read-Host "[$($user.alias)] Enter a different alias"
         } else {
             Write-Host "[$alias] Alias is available!" -ForegroundColor Green
             $aliasIsAvailable = $true
@@ -123,11 +125,15 @@ function ConnectToOnPremExchange
 # Creates the remote mailbox user
 function CreateRemoteMailboxUser
 {
-    param($firstName, $lastName, $name, $alias, $tempPassword, $upnSuffix, $resortSuffix, $newUserOU, $isFromCSV)
+    param($firstName, $lastName, $name, $alias, $tempPassword, $newUserOU, $isFromCSV)
 
     # If from CSV,convert password to secure string
     if ($isFromCSV) {
-        $password = ConvertTo-SecureString $tempPassword -AsPlainText -Force
+        $tempPassword = ConvertTo-SecureString $tempPassword -AsPlainText -Force
+    }
+
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        $name = "$firstName $lastName $resortSuffix"
     }
 
     $upn = $alias + "@" + $upnSuffix
@@ -148,14 +154,14 @@ function CreateRemoteMailboxUser
 # Adds some optional and required additional attributes to the user
 function AddAdditionalAttributesToUser
 {
-    param($alias, $description, $office, $officePhone, $title, $department, $company, $managerAlias, $extAttr2, $extAttr3)
+    param($alias, $description, $office, $officePhone, $title, $department, $managerAlias, $extAttr3)
 
 
     # Add additional attributes in AD
     Write-Host "[$alias] Setting additional attributes" -ForegroundColor Green
 
     $command = "Set-ADUser -Credential `$UserCredential -Identity $alias -Server $DomainController -Replace @{
-        extensionAttribute2=`"$extAttr2`"
+        extensionAttribute2=`"$resortCode`"
         extensionAttribute3=`"$extAttr3`"
     }"
 
@@ -188,15 +194,20 @@ function CloneSecurityGroupMembership
 # Validate Extension Attribute 3
 function GetExtAttr3
 {
+    param($extAttr3 = "")
     
     do
     {
-        $extAttr3 = Read-Host "ExtensionAttribute3 (licensing) [required]"
-        
+        # Get input for extAttr3 if not from CSV
+        if ([string]::IsNullOrWhiteSpace($extAttr3)) {
+            $extAttr3 = Read-Host "ExtensionAttribute3 for licensing"
+        }
+
         if ($extAttr3 -eq "F1;" -or $extAttr3 -eq "E1;" -or $extAttr3 -eq "E3;") {
             $extAttr3IsValid = $true;
         } else {
-            Write-Host "ExtensionAttribute 3 is invalid. Please use 'F1;', 'E1;', or 'E3;'." -ForegroundColor Red
+            Write-Host "[$($user.alias)] ExtensionAttribute 3 is invalid. You provided $extAttr3. Please use 'F1;', 'E1;', or 'E3;'." -ForegroundColor Red
+            $extAttr3 = Read-Host "[$($user.alias)] ExtensionAttribute3"
             $extAttr3IsValid = $false;
         }
 
@@ -207,9 +218,12 @@ function GetExtAttr3
 
 function Get-RealADUser
 {
-    param($userType)
+    param($userType, $isFromCSV = $false, $samAccountName = "")
 
-    $samAccountName = Read-Host "$($userType)'s Alias [optional]"
+    # Get samAccountName if not provided from CSV
+    if (!$isFromCSV) {
+        $samAccountName = Read-Host "$($userType)'s alias"
+    }
 
     do
     {
@@ -218,13 +232,13 @@ function Get-RealADUser
                 $isValidUser = $true # Break out of loop if no entry specified
             } else {
                 $ADUser = Get-ADUser -Identity $samAccountName
-                Write-Host "Using $($ADUser.Name) ($samAccountName) as $userType" -ForegroundColor DarkGray
+                Write-Host "[$($user.alias)] Using $($ADUser.Name) ($samAccountName) as $userType" -ForegroundColor DarkGray
                 $isValidUser = $true
             }
         }
         catch {
-            Write-Host "Unable to find $userType with alias '$samAccountName'." -ForegroundColor Red
-            $samAccountName = Read-Host "Enter a different alias or type 'S' to skip"
+            Write-Host "[$($user.alias)] Unable to find $userType with alias '$samAccountName'." -ForegroundColor Red
+            $samAccountName = Read-Host "[$($user.alias)] Enter a different alias for $userType or type 'S' to skip"
             if ($samAccountName.ToLower() -eq "s") {
                 $samAccountName = ""
                 $isValidUser= $true

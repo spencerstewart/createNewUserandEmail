@@ -1,0 +1,4 @@
+﻿fName,lName,alias,tempPassword,office,officePhone,description,title,department,managerAlias,extAttr3,userToCloneSecurityGroups
+Test,Spencer 8,test_spencer8,Summit18,Summit,(909) 866-5766 x140,487 - Testing Dept - Tester,testerrrr,Testing Department,fakeManager,F1;,mmossman
+Taylor,Swift,tswizzle,Summit18,Bear,909-555-1234,Singer,Singer,Music,sstewart,e1,
+Spencer,Stewart,sstewart,Summit18,Summit,(909) 866-5766 x420,496 - IT Dept - PC Tech,PC Tech,IT Dept,bbrissey,e1;,mmossman
